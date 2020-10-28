@@ -1,9 +1,7 @@
-#from pyimagesearch.transform import four_point_transform
-#from skimage.filters import threshold_local
 import numpy as np
-import argparse
 import cv2
 import imutils
+import os
 
 
 def vid_to_frames(filename):
@@ -71,27 +69,37 @@ def four_point_transform(image, pts):
     return warped
 
 
-# construct the argument parse and parse the arguments
-ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--image", help = "path to the image file")
-ap.add_argument("-c", "--coords",
-                help = "comma seperated list of source points")
-args = vars(ap.parse_args())
-# load the image and grab the source coordinates (i.e. the list of
-# of (x, y) points)
-# NOTE: using the 'eval' function is bad form, but for this example
-# let's just roll with it -- in future posts I'll show you how to
-# automatically determine the coordinates without pre-supplying them
-image = cv2.imread(args["image"])
-pts = np.array(eval(args["coords"]), dtype = "float32")
-# apply the four point tranform to obtain a "birds eye view" of
-# the image
-warped = four_point_transform(image, pts)
-# show the original and warped images
-cv2.startWindowThread()
-cv2.namedWindow("preview")
-cv2.imshow("Original", image)
-cv2.imwrite("test_warped.jpg", warped)
-cv2.waitKey(1)
+
+def scan(filename, output):
+    image = cv2.imread(filename)
+    filename = filename.split(os.sep)[-1]
+    ratio = image.shape[0] / 500.0
+    orig = image.copy()
+    image = imutils.resize(image, height = 500)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(gray, 75, 200)
+    print("STEP 1: Edge Detection")
+    print(os.path.join(output, filename.split(".")[0] + "_edged.jpg"))
+    cv2.imwrite(os.path.join(output, filename + "_edged.jpg"), edged)
+    cnts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:5]
+    for c in cnts:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        if len(approx) == 4:
+            screenCnt = approx
+            break
+    print("STEP 2: Find contours of paper")
+    cv2.drawContours(image, [screenCnt], -1, (0, 255, 0), 2)
+    cv2.imwrite(os.path.join(output, filename.split(".")[0] + "_outline.jpg"), image)
+    warped = four_point_transform(orig, screenCnt.reshape(4, 2) * ratio)
+    print("STEP 3: Apply perspective transform")
+    cv2.imwrite(os.path.join(output, filename.split(".")[0] + "_scanned.jpg"), imutils.resize(warped, height = 650))
 
 
+framesInput = "frames\input"
+framesOutput = "frames\output"
+for frame in os.listdir(framesInput):
+    scan(os.path.join(framesInput, frame), framesOutput)

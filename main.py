@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import imutils
 import os
+from matplotlib import pyplot as plt
+
 
 
 def vid_to_frames(filename):
@@ -70,20 +72,15 @@ def four_point_transform(image, pts):
 
 
 
-def scan(filename, output):
+def findEdges(filename):
     image = cv2.imread(filename)
-    filename = filename.split(os.sep)[-1]
-    ratio = image.shape[0] / 500.0
-    orig = image.copy()
     image = imutils.resize(image, height = 500)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
     edged = cv2.Canny(gray, 75, 200)
-    print("STEP 1: Edge Detection")
-    print(os.path.join(output, filename.split(".")[0] + "_edged.jpg"))
-    cv2.imwrite(os.path.join(output, filename + "_edged.jpg"), edged)
     cnts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
+
     cnts = sorted(cnts, key = cv2.contourArea, reverse = True)[:5]
     for c in cnts:
         peri = cv2.arcLength(c, True)
@@ -91,15 +88,71 @@ def scan(filename, output):
         if len(approx) == 4:
             screenCnt = approx
             break
-    print("STEP 2: Find contours of paper")
-    cv2.drawContours(image, [screenCnt], -1, (0, 255, 0), 2)
-    cv2.imwrite(os.path.join(output, filename.split(".")[0] + "_outline.jpg"), image)
-    warped = four_point_transform(orig, screenCnt.reshape(4, 2) * ratio)
-    print("STEP 3: Apply perspective transform")
-    cv2.imwrite(os.path.join(output, filename.split(".")[0] + "_scanned.jpg"), imutils.resize(warped, height = 650))
+    return screenCnt
 
 
-framesInput = "frames\input"
-framesOutput = "frames\output"
-for frame in os.listdir(framesInput):
-    scan(os.path.join(framesInput, frame), framesOutput)
+def drawOutline(frameInput, coords):
+    filename = frameInput.split(os.sep)[-1].split(".")[0]
+    image = cv2.imread(frameInput)
+    image = imutils.resize(image, height = 500)
+    cv2.drawContours(image, [coords], -1, (0, 255, 0), 2)
+    cv2.imwrite(os.path.join(framesOutput, filename + "_outline.jpg"), image)
+
+
+
+
+
+
+framesInput = os.path.join("frames", "input")
+framesOutput = os.path.join("frames", "output")
+framesInput = [os.path.join(framesInput, frame) for frame in os.listdir(framesInput)]
+template = r"templateP1.png"
+templateImage = cv2.imread(template)
+firstFrame = cv2.imread(framesInput[0])
+
+
+print("STEP 1: Edge Detection")
+edges = findEdges(framesInput[0]) * firstFrame.shape[0] /500
+templateImageEdges = np.array([[0,0], [1275, 0], [1275, 1650], [0, 1650]])
+
+ #calculate matrix H
+h, status = cv2.findHomography(edges, templateImageEdges)
+
+# provide a point you wish to map from image 1 to image 2
+pointsToTransform = [[940, 700]]
+#pointsToTransform = np.array([pointsToTransform], dtype='float32')
+#pointsToTransform = np.array([pointsToTransform])
+
+
+
+# finally, get the mapping
+print("template image size:", templateImage.shape)
+for point in pointsToTransform:
+    point = np.array([point], dtype='float32')
+    point = np.array([point])
+    pointsOut = cv2.perspectiveTransform(point, h)
+    print("x:", point[0,0,0], "y:", point[0,0,1], "\ntransformed x:", pointsOut.astype(int)[0,0,0], "transformed point y",  pointsOut.astype(int)[0,0,1])
+    #print(templateImage[pointsOut.astype(int)[0,0,0], pointsOut.astype(int)[0,0,1]])
+    x = pointsOut.astype(int)[0,0,0]
+    y = pointsOut.astype(int)[0,0,1]
+    templateImage[x-5:x+5, y-5:y+5] = [255,0,0]
+    plt.figure()
+    plt.imshow(templateImage)
+    plt.show()
+
+#print(templateImage[pointsOut.astype(int)[0,0,0], pointsOut.astype(int)[0,0,1]])
+    #cv2.imwrite(os.path.join(framesOutput, "test_outline.jpg"), templateImage)
+
+#test = cv2.imread(os.path.join(framesOutput, "test_outline.jpg"))
+
+
+
+
+
+
+#print(edges)
+#print("STEP 2: Draw outlines")
+#for frame in framesInput:
+#    drawOutline(frame, edges)
+
+

@@ -3,7 +3,6 @@ import cv2
 import sys
 import numpy as np
 import imutils
-import argparse
 from skimage.filters import threshold_local
 
 
@@ -37,15 +36,10 @@ def order_points(pts):
     return rect
 
 
-def get_homography(points, dst, margin=[(0, 0), (0, 0), (0, 0), (0, 0)]):
+def get_homography(points, dst):
     # Gets the homography transformation matrix from a set of 4 points to another 4 points
 
-    (tl, tr, br, bl) = order_points(points)
-    rect = np.array([tl + [margin[0][0], margin[0][1]],
-                     tr + [margin[1][0], margin[1][1]],
-                     br + [margin[2][0], margin[2][1]],
-                     bl + [margin[3][0], margin[3][1]]],
-                    dtype="float32")
+    rect = order_points(points)
 
     dst = np.array([[0, 0],
                     [dst[0] - 1, 0],
@@ -82,21 +76,13 @@ def get_points(image):
             return (approx * ratio).astype(int)
 
 
-""" Alternative way to parse args
-ap = argparse.ArgumentParser()
-ap.add_argument("-v", "--video", help="path to the video file", default="video.mp4")
-ap.add_argument("-t", "--template", help="template file", default="template.png")
-ap.add_argument("-o", "--output", help="output video", default="output.mp4")
-args = vars(ap.parse_args())
-"""
-
 if (len(sys.argv) < 3):
     print("Error: " + sys.argv[0] +
           " <video-path> <template-path> <optional-output-path>", file=sys.stderr)
     exit(1)
 
 args = {"video": sys.argv[1], "template": sys.argv[2],
-        "output": sys.argv[3] if len(sys.argv) > 3 else 'output.mp4'}
+        "output": sys.argv[3] if len(sys.argv) > 3 else 'nasty.mp4'}
 
 frames = vid_to_frames(args["video"])
 template = cv2.imread(args["template"])
@@ -104,7 +90,7 @@ out_video = cv2.VideoWriter(args["output"], cv2.VideoWriter_fourcc(
     *'mp4v'), 30, (template.shape[1], template.shape[0]))
 
 points = get_points(frames[0]).reshape(4, 2)
-homography = get_homography(points, template.shape, margin=[(3, -8), (1, 0), (5, 5), (-1, 5)])
+homography = get_homography(points, template.shape)
 
 for f in range(len(frames)):
     # cv2.drawContours(frames[f], [paper_pts], -1, (0, 255, 0), 2)

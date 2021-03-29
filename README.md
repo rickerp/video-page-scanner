@@ -14,6 +14,6 @@ Run
 ```python3
 python3 main.py -v VIDEO -o OUTPUT -t TEMPLATE
 ```
-- VIDEO - Video input file containing the paper (default: video.mp4)
-- OUTPUT - Name of the output video file (default: output.mp4)
-- TEMPLATE (optional) - Image file containing the wanted dimensions of output paper in the video (default dimensions: 1275x1650)
+- `VIDEO` - Video input file containing the paper (default: video.mp4)
+- `OUTPUT` - Name of the output video file (default: output.mp4)
+- `TEMPLATE` (optional) - Image file containing the wanted dimensions of output paper in the video (default dimensions: 1275x1650)
